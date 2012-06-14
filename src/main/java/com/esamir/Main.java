@@ -92,17 +92,37 @@ public class Main {
 
 	public static JSONObject serializeComplex(Object value) {
 		if (value instanceof Map) {
+
 			Map map_value = (Map) value;
 			JSONArray jsonarray = new JSONArray();
 			JSONObject jsonObject = new JSONObject();
 			Iterator it = map_value.values().iterator();
 			Object item_value = it.next();
+
 			if (item_value instanceof XCacheComplexObject)  // Simple? Complex Object
 			{
-				logger.info(((XCacheComplexObject) item_value).serialize(new JSONObject()));
+				Iterator keys_it = map_value.keySet().iterator();
+
+				while (keys_it.hasNext()) {
+					JSONObject mapper = new JSONObject();
+					Object map_key = keys_it.next();
+					XCacheComplexObject entry = (XCacheComplexObject) map_value.get(map_key);
+					logger.info(entry.serialize(mapper));
+					mapper.put("MAP_KEY_TYPE", map_key.getClass().getName());
+					mapper.put("MAP_KEY", map_key);
+					jsonarray.add(mapper);
+				}
+				jsonObject.put("MAP_ITEM_VALUE", jsonarray);
+				return jsonObject;
+
 
 			} else if (item_value instanceof Map) {  // HashMap
-				serializeComplex(item_value);
+				it = map_value.values().iterator();
+				logger.info("in Map: size of map is:" + ((Map) item_value).size());
+				while (it.hasNext()) {
+					item_value = it.next();
+					serializeComplex(item_value);
+				}
 
 			} else if (item_value instanceof Collection) {  //ie. List.
 
@@ -142,7 +162,6 @@ public class Main {
 					Seller obj = Seller.getRandomInstance();
 					b.put(key_l3, obj);
 				}
-
 			}
 			parent_map.put(key_l1, a);
 
@@ -150,7 +169,6 @@ public class Main {
 
 		return parent_map;
 	}
-
 
 	public static void main(String[] args) {
 		Map serializeMe = buildMapInstance();
@@ -160,8 +178,10 @@ public class Main {
 		simpleMap.put(3, Seller.getRandomInstance());
 		simpleMap.put(4, Seller.getRandomInstance());
 		simpleMap.put(5, Seller.getRandomInstance());
+		Map secondLevel = new HashMap();
+		secondLevel.put("69", simpleMap);
 
-		serializeComplex(simpleMap);
+		JSONObject foobar = serializeComplex(simpleMap);
 
 
 		//build
