@@ -5,6 +5,8 @@ import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Logger;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 
 import java.util.*;
 
@@ -28,6 +30,11 @@ public class Main {
 		return key + ":" + objectName;
 	}
 
+	private static final String MAP_KEY = "MAP_KEY";
+	private static final String MAP_KEY_TYPE = "MAP_KEY_TYPE";
+	private static final String CONTAINER_TYPE = "CONTAINER_TYPE";
+	private static final String ENTRY_VALUE = "SERIALIZED_VALUE";
+	private static final String COMPLEX_OBJECT_ENTRY = "COMPLEX_OBJECT_ENTRY";
 
 	public static Object put2(Object key, Object value) {
 
@@ -38,47 +45,14 @@ public class Main {
 			if (value instanceof XCacheObject) {
 				XCacheObject xcacheObject = (XCacheObject) value;
 				xcacheObject.populateCacheMap(xcacheObjectData);
-			} else if (value instanceof Collection) {
-				logger.debug("found a collection and I'll fix it up like a collection");
-
-				Iterator<XCacheComplexObject> xcacheObjectsIter = ((Collection<XCacheComplexObject>) value).iterator();
-				JSONObject mapper = new JSONObject();
-
-				while (xcacheObjectsIter.hasNext()) {
-					XCacheComplexObject xcacheComplexDataObject = xcacheObjectsIter.next();
-					xcacheObjectData.put(xcacheComplexDataObject.getCacheId(), xcacheComplexDataObject.serialize(mapper));
-					mapper.clear();
-				}
-				return xcacheObjectData;
-			} else if (value instanceof Map) {
-				Map map_values = (Map) value;
-
-				if (map_values.keySet().size() == 0)
-					return null;
-
-				JSONObject jsonMap = new JSONObject();
-				JSONArray jsonArray = new JSONArray();
-
-
-				Iterator it = map_values.values().iterator();
-				Object item_value = it.next();
-
-				if ((item_value instanceof Map) || (item_value instanceof Collection)) {
-					// Call yourself.
-				} else if (item_value instanceof XCacheComplexObject) {
-					JSONObject mapper = new JSONObject();
-					xcacheObjectData.put(((XCacheComplexObject) item_value).getCacheId(), ((XCacheComplexObject) item_value).serialize(mapper));
-				}
-				logger.debug("Value type is: " + item_value.getClass().getName());
-
+			} else if (value instanceof Map || value instanceof Collection) {
+				xcacheObjectData.put(COMPLEX_OBJECT_ENTRY, ((JSONObject)serializeComplex(value)).toJSONString());
 			} else {
 				logger.debug(value.getClass().getName());
 				logger.debug("I did not find an XCache Object nor a collection");
 			}
 
 			final String compositeKey = getCompositeKey(key);
-
-			// xCacheCassandraManager.updateRow(compositeKey, xcacheObjectData);
 			logger.info("Inserted " + objectName + " into Cassandra: " + compositeKey);
 
 			return xcacheObjectData;
@@ -87,27 +61,27 @@ public class Main {
 		}
 	}
 
-	public static JSONObject serializeComplex(Object value) {
+	public static Object serializeComplex(Object value) {
+
 		if (value instanceof Map)  //Main container is a map
 		{
 
 			Map map = (Map) value;
 			JSONArray jsonarray = new JSONArray();
-			JSONObject jsonObject = new JSONObject();
 			//Iterator it = map.values().iterator();
 			Iterator keys_it = map.keySet().iterator();
 			//
 			while (keys_it.hasNext()) {
 				Object map_key = keys_it.next();
 				JSONObject jsonMapEntry = new JSONObject();
-				jsonMapEntry.put("MAP_KEY", map_key);
-				jsonMapEntry.put("MAP_KEY_TYPE", map_key.getClass().getName());
+				jsonMapEntry.put(MAP_KEY, map_key);
+				jsonMapEntry.put(MAP_KEY_TYPE, map_key.getClass().getName());
 				Object map_value = map.get(map_key);
-				jsonMapEntry.put("SERIALIZED_ITEM_VALUE", serializeComplex(map_value));
+				jsonMapEntry.put(ENTRY_VALUE, serializeComplex(map_value));
+				jsonMapEntry.put(CONTAINER_TYPE, "MAP");
 				jsonarray.add(jsonMapEntry);
 			}
-			jsonObject.put("SERIALIZED_MAP_VALUE", jsonarray);
-			return jsonObject;
+			return jsonarray;
 
 		} else if (value instanceof XCacheComplexObject) {
 			XCacheComplexObject complex = (XCacheComplexObject) value;
@@ -115,9 +89,11 @@ public class Main {
 			String payload = complex.serialize(jsonvalue);
 			return jsonvalue;
 
+
 		} else if (value instanceof Collection) {
 			JSONArray jsonarray = new JSONArray();
 			JSONObject jsonObject = new JSONObject();
+			jsonarray.clear();
 
 			Collection item_collection = (Collection) value;
 			Iterator item_iterator = item_collection.iterator();
@@ -126,15 +102,48 @@ public class Main {
 				jsonarray.add(serializeComplex(obj));
 				obj = item_iterator.next();
 			}
-			jsonObject.put("SERIALIZED_LIST_VALUE", jsonarray);
-			return jsonObject;
+			return jsonarray;
 
 		} else {
 			logger.error("Unsupported key detected");
 		}
 
-		return new JSONObject();
+		return new JSONArray();
 	}
+
+	public static List deserializeComplex(String payload) {
+
+		JSONParser parser = new JSONParser();
+		try {
+
+			Object oPayload =  parser.parse(payload);
+			if(oPayload instanceof JSONArray)
+			{
+				JSONArray data = (JSONArray) oPayload;
+				logger.info("Detected a json Array");
+				for(int i=0; i < data.size(); i++)
+				{
+					JSONObject values = (JSONObject) data.get(i);
+					if(values.containsKey(MAP_KEY)) {
+						//treat as a map.
+					}
+					int z= 0;
+
+				}
+
+			}
+			else if(oPayload instanceof JSONObject) {
+				logger.info("Detected a json Object");
+
+			}
+
+		} catch (ParseException e) {
+			e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+		}
+
+		return new ArrayList();
+	}
+
 
 	public static Map buildMapInstance() {
 		Utility util = Utility.getInstance();
@@ -189,14 +198,17 @@ public class Main {
 		secondLevel.put(5, list);
 		secondLevel.put(7, list2);
 		secondLevel.put("69", simpleMap);
+		secondLevel.put("96", simpleMap3);
 		secondLevel.put(23, Seller.getRandomInstance());
 		//secondLevel.put("23", simpleMap2);
 		//secondLevel.put("34", simpleMap3);
 
 
-		JSONObject foobar = serializeComplex(secondLevel);
+		JSONArray foobar = (JSONArray) serializeComplex(list);
 		//JSONObject foobar = serializeComplex(simpleMap2);
-		logger.info("woot:  " + foobar.toJSONString());
+		String buffer = foobar.toJSONString();
+		logger.info("woot:  " + buffer);
+		deserializeComplex(buffer);
 
 
 		//build
@@ -204,7 +216,6 @@ public class Main {
 			Double a = Math.pow(i, 2.0);
 
 		}
-		logger.info("woot");
 
 
 	}
