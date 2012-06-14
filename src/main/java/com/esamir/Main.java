@@ -6,10 +6,7 @@ import org.apache.log4j.Logger;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
 
 /**
  * User: sfaci
@@ -91,43 +88,26 @@ public class Main {
 	}
 
 	public static JSONObject serializeComplex(Object value) {
-		if (value instanceof Map) {
+		if (value instanceof Map)  //Main container is a map
+		{
 
-			Map map_value = (Map) value;
+			Map map = (Map) value;
 			JSONArray jsonarray = new JSONArray();
 			JSONObject jsonObject = new JSONObject();
-			Iterator it = map_value.values().iterator();
-			Object item_value = it.next();
-
-			if (item_value instanceof XCacheComplexObject)  // Simple? Complex Object
-			{
-				Iterator keys_it = map_value.keySet().iterator();
-
-				while (keys_it.hasNext()) {
-					JSONObject mapper = new JSONObject();
-					Object map_key = keys_it.next();
-					XCacheComplexObject entry = (XCacheComplexObject) map_value.get(map_key);
-					logger.info(entry.serialize(mapper));
-					mapper.put("MAP_KEY_TYPE", map_key.getClass().getName());
-					mapper.put("MAP_KEY", map_key);
-					jsonarray.add(mapper);
-				}
-				jsonObject.put("MAP_ITEM_VALUE", jsonarray);
-				return jsonObject;
-
-
-			} else if (item_value instanceof Map) {  // HashMap
-				it = map_value.values().iterator();
-				logger.info("in Map: size of map is:" + ((Map) item_value).size());
-				while (it.hasNext()) {
-					item_value = it.next();
-					serializeComplex(item_value);
-				}
-
-			} else if (item_value instanceof Collection) {  //ie. List.
-
+			//Iterator it = map.values().iterator();
+			Iterator keys_it = map.keySet().iterator();
+			//
+			while (keys_it.hasNext()) {
+				Object map_key = keys_it.next();
+				JSONObject jsonMapEntry = new JSONObject();
+				jsonMapEntry.put("MAP_KEY", map_key);
+				jsonMapEntry.put("MAP_KEY_TYPE", map_key.getClass().getName());
+				Object map_value = map.get(map_key);
+				jsonMapEntry.put("SERIALIZED_ITEM_VALUE", serializeComplex(map_value));
+				jsonarray.add(jsonMapEntry);
 			}
-
+			jsonObject.put("SERIALIZED_MAP_VALUE", jsonarray);
+			return jsonObject;
 
 		} else if (value instanceof XCacheComplexObject) {
 			XCacheComplexObject complex = (XCacheComplexObject) value;
@@ -135,11 +115,25 @@ public class Main {
 			String payload = complex.serialize(jsonvalue);
 			return jsonvalue;
 
+		} else if (value instanceof Collection) {
+			JSONArray jsonarray = new JSONArray();
+			JSONObject jsonObject = new JSONObject();
+
+			Collection item_collection = (Collection) value;
+			Iterator item_iterator = item_collection.iterator();
+			Object obj = item_iterator.next();
+			while (item_iterator.hasNext()) {
+				jsonarray.add(serializeComplex(obj));
+				obj = item_iterator.next();
+			}
+			jsonObject.put("SERIALIZED_LIST_VALUE", jsonarray);
+			return jsonObject;
+
 		} else {
 			logger.error("Unsupported key detected");
 		}
 
-		return null;
+		return new JSONObject();
 	}
 
 	public static Map buildMapInstance() {
@@ -171,17 +165,38 @@ public class Main {
 	}
 
 	public static void main(String[] args) {
-		Map serializeMe = buildMapInstance();
-		Map simpleMap = new HashMap();
-		simpleMap.put(1, Seller.getRandomInstance());
-		simpleMap.put(2, Seller.getRandomInstance());
-		simpleMap.put(3, Seller.getRandomInstance());
-		simpleMap.put(4, Seller.getRandomInstance());
-		simpleMap.put(5, Seller.getRandomInstance());
-		Map secondLevel = new HashMap();
-		secondLevel.put("69", simpleMap);
+		//Map serializeMe = buildMapInstance();
+		//JSONObject foobar = serializeComplex(serializeMe);
 
-		JSONObject foobar = serializeComplex(simpleMap);
+
+		Map simpleMap = new HashMap();
+		Map simpleMap2 = new HashMap();
+		Map simpleMap3 = new HashMap();
+
+		for (int i = 0; i < 5; i++) {
+			simpleMap.put(i, Seller.getRandomInstance());
+			simpleMap2.put(i * 3, Seller.getRandomInstance());
+			simpleMap3.put(i * 4, Seller.getRandomInstance());
+		}
+
+		Map secondLevel = new HashMap();
+		List list = new ArrayList();
+		List list2 = new ArrayList();
+		for (int i = 0; i < 10; i++) {
+			list.add(Seller.getRandomInstance());
+			list2.add(Seller.getRandomInstance());
+		}
+		secondLevel.put(5, list);
+		secondLevel.put(7, list2);
+		secondLevel.put("69", simpleMap);
+		secondLevel.put(23, Seller.getRandomInstance());
+		//secondLevel.put("23", simpleMap2);
+		//secondLevel.put("34", simpleMap3);
+
+
+		JSONObject foobar = serializeComplex(secondLevel);
+		//JSONObject foobar = serializeComplex(simpleMap2);
+		logger.info("woot:  " + foobar.toJSONString());
 
 
 		//build
