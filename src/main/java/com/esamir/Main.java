@@ -8,6 +8,7 @@ import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
+import java.io.*;
 import java.util.*;
 
 /**
@@ -78,7 +79,7 @@ public class Main {
 				jsonMapEntry.put(MAP_KEY_TYPE, map_key.getClass().getName());
 				Object map_value = map.get(map_key);
 				jsonMapEntry.put(ENTRY_VALUE, serializeComplex(map_value));
-				jsonMapEntry.put(CONTAINER_TYPE, "MAP");
+				jsonMapEntry.put(CONTAINER_TYPE, Map.class.getName());
 				jsonarray.add(jsonMapEntry);
 			}
 			return jsonarray;
@@ -94,6 +95,7 @@ public class Main {
 			JSONArray jsonarray = new JSONArray();
 			JSONObject jsonObject = new JSONObject();
 			jsonarray.clear();
+            jsonObject.put(CONTAINER_TYPE, Collection.class.getName());
 
 			Collection item_collection = (Collection) value;
 			Iterator item_iterator = item_collection.iterator();
@@ -102,7 +104,8 @@ public class Main {
 				jsonarray.add(serializeComplex(obj));
 				obj = item_iterator.next();
 			}
-			return jsonarray;
+            jsonObject.put(ENTRY_VALUE, jsonarray );
+			return jsonObject;
 
 		} else {
 			logger.error("Unsupported key detected");
@@ -173,9 +176,40 @@ public class Main {
 		return parent_map;
 	}
 
+    public static void writeToFile(String fileName, String data)
+    {
+        try {
+            FileWriter fstream = new FileWriter(fileName);
+            BufferedWriter out = new BufferedWriter(fstream);
+            out.write(data);
+            out.flush();
+            out.close();
+            fstream.close();
+            logger.info("Successfully wrote data to " + fileName);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static String readFromfile(String fileName)
+    {
+        StringBuffer buffer = new StringBuffer();
+        try {
+            BufferedReader in = new BufferedReader(new FileReader(fileName));
+            String str;
+            while ((str = in.readLine()) != null) {
+                buffer.append(str);
+            }
+            in.close();
+        } catch (IOException e) {
+        }
+        return buffer.toString();
+    }
+
 	public static void main(String[] args) {
 		//Map serializeMe = buildMapInstance();
 		//JSONObject foobar = serializeComplex(serializeMe);
+
 
 
 		Map simpleMap = new HashMap();
@@ -204,11 +238,24 @@ public class Main {
 		//secondLevel.put("34", simpleMap3);
 
 
-		JSONArray foobar = (JSONArray) serializeComplex(list);
+        String buffer = "";
+		Object ret =  serializeComplex(simpleMap);
+
+        if( ret instanceof JSONArray)
+            buffer = ((JSONArray)ret).toJSONString();
+        else if(ret instanceof JSONObject)
+            buffer = ((JSONObject)ret).toJSONString();
+
+        logger.info(buffer);
 		//JSONObject foobar = serializeComplex(simpleMap2);
-		String buffer = foobar.toJSONString();
-		logger.info("woot:  " + buffer);
-		deserializeComplex(buffer);
+
+        writeToFile("/tmp/samir.json", buffer);
+
+
+        //String buffer = readFromfile("/tmp/samir.json");
+
+		//logger.info("woot:  " + buffer);
+		//deserializeComplex(buffer);
 
 
 		//build
