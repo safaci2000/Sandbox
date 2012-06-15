@@ -114,38 +114,58 @@ public class Main {
 		return new JSONArray();
 	}
 
-	public static List deserializeComplex(String payload) {
+	public static Object deserializeComplex(Object value) {
 
-		JSONParser parser = new JSONParser();
-		try {
+        if(value instanceof JSONArray)
+        {
+            logger.debug("found an instance of a JSONArray");
+            /*
+            JSONArray data = (JSONArray) oPayload;
+            logger.info("Detected a json Array");
+            for(int i=0; i < data.size(); i++)
+            {
+                JSONObject values = (JSONObject) data.get(i);
+                if(values.containsKey(MAP_KEY)) {
+                    //treat as a map.
+                }
+                int z= 0;
 
-			Object oPayload =  parser.parse(payload);
-			if(oPayload instanceof JSONArray)
-			{
-				JSONArray data = (JSONArray) oPayload;
-				logger.info("Detected a json Array");
-				for(int i=0; i < data.size(); i++)
-				{
-					JSONObject values = (JSONObject) data.get(i);
-					if(values.containsKey(MAP_KEY)) {
-						//treat as a map.
-					}
-					int z= 0;
+            }
+            */
 
-				}
+        }
+        else if(value instanceof JSONObject) {
 
-			}
-			else if(oPayload instanceof JSONObject) {
-				logger.info("Detected a json Object");
+            logger.debug("found an instance of a JSONObject");
+            JSONObject jsonValue = (JSONObject) value;
+            //Ensure that it contains a type identifier and it is a java collection.
+            if(jsonValue.containsKey(CONTAINER_TYPE) && ((String)jsonValue.get(CONTAINER_TYPE)).equals(Collection.class.getName())) {
+                if(jsonValue.containsKey(ENTRY_VALUE) == false) {
+                    return new ArrayList(); // no payload , returning empty list.
+                }
+                Object payload = jsonValue.get(ENTRY_VALUE);
+                if(payload instanceof JSONArray) {
+                    JSONArray payloadArray = (JSONArray) payload;
+                    Collection result = new ArrayList();
+                    for(Object arrayItem : payloadArray) {
+                        if(arrayItem instanceof JSONObject) {
+                            JSONObject jsonArrayItem = (JSONObject) arrayItem;
+                            Seller item_value = new Seller();   //replace this with an XCacheComplexObject instantiation class
+                            item_value.deserialize(jsonArrayItem.toJSONString());
+                            result.add(item_value);
+                        }
+                    }
+                    return result;
+                }
+            }
+            else {
+                    // payload was not an array.. unsure how to handle.. return empty list.
+                    return new ArrayList();
+            }
+        }
 
-			}
-
-		} catch (ParseException e) {
-			e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
-		}
-
-		return new ArrayList();
-	}
+        return null;
+    }
 
 
 	public static Map buildMapInstance() {
@@ -210,7 +230,7 @@ public class Main {
 		//Map serializeMe = buildMapInstance();
 		//JSONObject foobar = serializeComplex(serializeMe);
 
-
+        /*
 
 		Map simpleMap = new HashMap();
 		Map simpleMap2 = new HashMap();
@@ -239,7 +259,7 @@ public class Main {
 
 
         String buffer = "";
-		Object ret =  serializeComplex(simpleMap);
+		Object ret =  serializeComplex(list);
 
         if( ret instanceof JSONArray)
             buffer = ((JSONArray)ret).toJSONString();
@@ -250,12 +270,17 @@ public class Main {
 		//JSONObject foobar = serializeComplex(simpleMap2);
 
         writeToFile("/tmp/samir.json", buffer);
+        */
+        String buffer = readFromfile("/tmp/samir.json");
+        JSONParser parser = new JSONParser();
+        try {
+            Object value = parser.parse(buffer);
+            Object v = deserializeComplex(value);
+            int i = 0;
+        } catch (ParseException e) {
+            e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+        }
 
-
-        //String buffer = readFromfile("/tmp/samir.json");
-
-		//logger.info("woot:  " + buffer);
-		//deserializeComplex(buffer);
 
 
 		//build
