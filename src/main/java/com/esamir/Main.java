@@ -140,9 +140,12 @@ public class Main {
                     for(Object arrayItem : payloadArray) {
                         if(arrayItem instanceof JSONObject) {
                             JSONObject jsonArrayItem = (JSONObject) arrayItem;
-                            Seller item_value = new Seller();   //replace this with an XCacheComplexObject instantiation class
+                            result.add(deserializeComplex(jsonArrayItem));
+                            /*
+                            XCacheComplexObject item_value = new Seller();   //replace this with an XCacheComplexObject instantiation class
                             item_value.deserialize(jsonArrayItem.toJSONString());
                             result.add(item_value);
+                            */
                         }
                     }
                     return result;
@@ -171,25 +174,34 @@ public class Main {
 
                                     Long temp = (Long) keyValue;
                                     keyValue = (Integer) temp.intValue();
+
+                                } else if(keyValue.getClass().getName().equals(Float.class.getName()) && keyValue.getClass().getName().equals(keyType) == false) {
+
+                                    Double temp = (Double ) keyValue;
+                                    keyValue = (Float ) temp.floatValue();
                                 }
                                 logger.info(keyValue.getClass().getName());
 
-                                Seller item_value = new Seller();   //replace this with an XCacheComplexObject instantiation class
-                                map.put(keyValue, item_value);
+
+                                XCacheComplexObject item_value = new Seller();   //replace this with an XCacheComplexObject instantiation class
+                                //item_value.deserialize(mapValue.toJSONString());
+                                map.put(keyValue, deserializeComplex(mapValue));
                             }
                         } //end for loop.
                         return map;
                     }
                 }
-
-
-
             }
-
-
-            else {
-                    // payload was not an array.. unsure how to handle.. return empty list.
+            else  // if it falls through then it is a ComplexObject
+            {
+                logger.debug("I didn't find a Map or a List, presuming XCacheComplexObject");
+                //JSONObject payload = (JSONObject) value.get(ENTRY_VALUE);
+                XCacheComplexObject item_value = new Seller();   //replace this with an XCacheComplexObject instantiation class
+                if(item_value == null)
                     return null;
+
+                item_value.deserialize(value.toJSONString());
+                return item_value;
             }
         }
 
