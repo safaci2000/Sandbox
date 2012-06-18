@@ -5,8 +5,10 @@ import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Logger;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
+import org.json.simple.JSONValue;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
+import sun.org.mozilla.javascript.internal.Interpreter;
 
 import java.io.*;
 import java.util.*;
@@ -66,23 +68,30 @@ public class Main {
 
 		if (value instanceof Map)  //Main container is a map
 		{
+            JSONObject jsonObject = new JSONObject();
 
 			Map map = (Map) value;
-			JSONArray jsonarray = new JSONArray();
 			//Iterator it = map.values().iterator();
 			Iterator keys_it = map.keySet().iterator();
-			//
+            JSONArray jsonarray = new JSONArray();
 			while (keys_it.hasNext()) {
 				Object map_key = keys_it.next();
 				JSONObject jsonMapEntry = new JSONObject();
-				jsonMapEntry.put(MAP_KEY, map_key);
-				jsonMapEntry.put(MAP_KEY_TYPE, map_key.getClass().getName());
 				Object map_value = map.get(map_key);
-				jsonMapEntry.put(ENTRY_VALUE, serializeComplex(map_value));
-				jsonMapEntry.put(CONTAINER_TYPE, Map.class.getName());
+                JSONObject jsonValue = (JSONObject) serializeComplex(map_value);
+
+                jsonMapEntry.put(ENTRY_VALUE, jsonValue);
+                jsonMapEntry.put(MAP_KEY, map_key);
+                jsonMapEntry.put(MAP_KEY_TYPE, map_key.getClass().getName());
+                //jsonMapEntry.put(MAP_KEY, map_key);
+                //jsonMapEntry.put(MAP_KEY_TYPE, map_key.getClass().getName());
+				//jsonMapEntry.put(CONTAINER_TYPE, Map.class.getName());
 				jsonarray.add(jsonMapEntry);
 			}
-			return jsonarray;
+            jsonObject.put(ENTRY_VALUE, jsonarray);
+            jsonObject.put(CONTAINER_TYPE, Map.class.getName());
+
+            return jsonObject;
 
 		} else if (value instanceof XCacheComplexObject) {
 			XCacheComplexObject complex = (XCacheComplexObject) value;
@@ -114,36 +123,17 @@ public class Main {
 		return new JSONArray();
 	}
 
-	public static Object deserializeComplex(Object value) {
+	public static Object deserializeComplex(JSONObject value) {
 
-        if(value instanceof JSONArray)
-        {
-            logger.debug("found an instance of a JSONArray");
-            /*
-            JSONArray data = (JSONArray) oPayload;
-            logger.info("Detected a json Array");
-            for(int i=0; i < data.size(); i++)
-            {
-                JSONObject values = (JSONObject) data.get(i);
-                if(values.containsKey(MAP_KEY)) {
-                    //treat as a map.
-                }
-                int z= 0;
-
-            }
-            */
-
-        }
-        else if(value instanceof JSONObject) {
+         if(value instanceof JSONObject) {
 
             logger.debug("found an instance of a JSONObject");
-            JSONObject jsonValue = (JSONObject) value;
             //Ensure that it contains a type identifier and it is a java collection.
-            if(jsonValue.containsKey(CONTAINER_TYPE) && ((String)jsonValue.get(CONTAINER_TYPE)).equals(Collection.class.getName())) {
-                if(jsonValue.containsKey(ENTRY_VALUE) == false) {
+            if(value.containsKey(CONTAINER_TYPE) && ((String)value.get(CONTAINER_TYPE)).equals(Collection.class.getName())) {
+                if(value.containsKey(ENTRY_VALUE) == false) {
                     return new ArrayList(); // no payload , returning empty list.
                 }
-                Object payload = jsonValue.get(ENTRY_VALUE);
+                Object payload = value.get(ENTRY_VALUE);
                 if(payload instanceof JSONArray) {
                     JSONArray payloadArray = (JSONArray) payload;
                     Collection result = new ArrayList();
@@ -157,10 +147,49 @@ public class Main {
                     }
                     return result;
                 }
+            } else if(value.containsKey(CONTAINER_TYPE) && ((String)value.get(CONTAINER_TYPE)).equals(Map.class.getName()))  {
+                logger.info("Found a map instance");
+                Map map  = new HashMap();
+                if(value.containsKey(ENTRY_VALUE)) {
+                    Object payload = value.get(ENTRY_VALUE);
+                    if(payload instanceof JSONArray) {
+
+                        for(Object item :((JSONArray) payload)) {
+                            if(item instanceof JSONObject) {
+                                JSONObject jsonArrayItem = (JSONObject) item;
+                                String keyType = (String) jsonArrayItem.get(MAP_KEY_TYPE);
+                                Object keyValue = jsonArrayItem.get(MAP_KEY);
+                                JSONObject mapValue = ((JSONObject) jsonArrayItem.get(ENTRY_VALUE));
+
+                                if(mapValue == null || keyType == null || keyValue == null) {
+                                    logger.error("Invalid data detected for map entry with value of: " + mapValue + " key Value of: " + keyValue + " with type of: " + keyType);
+                                    continue;
+                                }
+                                //Gotchas
+                                //Our JSON library favors Longs over Ints, downcasting to match initial object.
+                                if(keyValue.getClass().getName().equals(Long.class.getName()) && keyValue.getClass().getName().equals(keyType) == false) {
+
+                                    Long temp = (Long) keyValue;
+                                    keyValue = (Integer) temp.intValue();
+                                }
+                                logger.info(keyValue.getClass().getName());
+
+                                Seller item_value = new Seller();   //replace this with an XCacheComplexObject instantiation class
+                                map.put(keyValue, item_value);
+                            }
+                        } //end for loop.
+                        return map;
+                    }
+                }
+
+
+
             }
+
+
             else {
                     // payload was not an array.. unsure how to handle.. return empty list.
-                    return new ArrayList();
+                    return null;
             }
         }
 
@@ -226,12 +255,49 @@ public class Main {
         return buffer.toString();
     }
 
-	public static void main(String[] args) {
-		//Map serializeMe = buildMapInstance();
-		//JSONObject foobar = serializeComplex(serializeMe);
+    public static String writeListObject()
+    {
+		List list = new ArrayList();
+		for (int i = 0; i < 10; i++) {
+			list.add(Seller.getRandomInstance());
+		}
+
+        Object ret =  serializeComplex(list);
+        String buffer = "";
+
+        if( ret instanceof JSONArray)
+            buffer = ((JSONArray)ret).toJSONString();
+        else if(ret instanceof JSONObject)
+            buffer = ((JSONObject)ret).toJSONString();
+
+        return buffer;
+
+    }
+    public static String writeMapObject()
+    {
+        Map serializeMe = buildMapInstance();
+        Map simpleMap = new HashMap();
+
+		for (int i = 0; i < 5; i++) {
+			simpleMap.put(i, Seller.getRandomInstance());
+		}
+
+        String buffer = "";
+		Object ret =  serializeComplex(simpleMap);
+
+        if( ret instanceof JSONArray)
+            buffer = ((JSONArray)ret).toJSONString();
+        else if(ret instanceof JSONObject)
+            buffer = ((JSONObject)ret).toJSONString();
+
+        return buffer;
+    }
+    public static void writeObject(String type)
+    {
+        //JSONObject foobar = serializeComplex(serializeMe);
+        Map map = buildMapInstance();
 
         /*
-
 		Map simpleMap = new HashMap();
 		Map simpleMap2 = new HashMap();
 		Map simpleMap3 = new HashMap();
@@ -258,8 +324,9 @@ public class Main {
 		//secondLevel.put("34", simpleMap3);
 
 
+        */
         String buffer = "";
-		Object ret =  serializeComplex(list);
+		Object ret =  serializeComplex(map);
 
         if( ret instanceof JSONArray)
             buffer = ((JSONArray)ret).toJSONString();
@@ -270,25 +337,48 @@ public class Main {
 		//JSONObject foobar = serializeComplex(simpleMap2);
 
         writeToFile("/tmp/samir.json", buffer);
-        */
-        String buffer = readFromfile("/tmp/samir.json");
+
+    }
+
+    public static void generateSampleData()
+    {
+        String buffer = "";
+        buffer = writeMapObject();
+        writeToFile("/tmp/map.json", buffer);
+        buffer = writeListObject();
+        //writeToFile("/tmp/list.json", buffer);
+
+    }
+
+    public static void readSampleData()
+    {
+         String fileName = "/tmp/map.json";
+
+        String raw_data = readFromfile(fileName);
         JSONParser parser = new JSONParser();
+        Object v = null;
         try {
-            Object value = parser.parse(buffer);
-            Object v = deserializeComplex(value);
+            JSONObject value = (JSONObject) parser.parse(raw_data);
+            v =  deserializeComplex(value);
             int i = 0;
         } catch (ParseException e) {
-            e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+            e.printStackTrace();
         }
+        logger.info("exiting readSampleData");
 
 
 
-		//build
-		for (int i = 0; i < 10; i++) {
-			Double a = Math.pow(i, 2.0);
+    }
 
-		}
+	public static void main(String[] args) {
+        //generateSampleData();
+        //writeObject("");
+        readSampleData();
 
+
+
+
+        logger.info("THE END");
 
 	}
 
