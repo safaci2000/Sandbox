@@ -8,7 +8,6 @@ import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
-import sun.org.mozilla.javascript.internal.Interpreter;
 
 import java.io.*;
 import java.util.*;
