@@ -29,40 +29,12 @@ public class Main {
 		BasicConfigurator.configure();
 	}
 
-	static private String getCompositeKey(Object key) {
-		return key + ":" + objectName;
-	}
 
 	private static final String MAP_KEY = "MAP_KEY";
 	private static final String MAP_KEY_TYPE = "MAP_KEY_TYPE";
 	private static final String CONTAINER_TYPE = "CONTAINER_TYPE";
 	private static final String ENTRY_VALUE = "SERIALIZED_VALUE";
 	private static final String COMPLEX_OBJECT_ENTRY = "COMPLEX_OBJECT_ENTRY";
-
-	public static Object put2(Object key, Object value) {
-
-		if (key instanceof Long) {
-			Map<String, Object> xcacheObjectData = new HashMap<String, Object>();
-
-			//Single case.
-			if (value instanceof XCacheObject) {
-				XCacheObject xcacheObject = (XCacheObject) value;
-				xcacheObject.populateCacheMap(xcacheObjectData);
-			} else if (value instanceof Map || value instanceof Collection) {
-				xcacheObjectData.put(COMPLEX_OBJECT_ENTRY, ((JSONObject)serializeComplex(value)).toJSONString());
-			} else {
-				logger.debug(value.getClass().getName());
-				logger.debug("I did not find an XCache Object nor a collection");
-			}
-
-			final String compositeKey = getCompositeKey(key);
-			logger.info("Inserted " + objectName + " into Cassandra: " + compositeKey);
-
-			return xcacheObjectData;
-		} else {
-			return null;
-		}
-	}
 
 	public static Object serializeComplex(Object value) {
 
@@ -120,7 +92,7 @@ public class Main {
 			logger.error("Unsupported key detected");
 		}
 
-		return new JSONArray();
+        return new JSONObject();
 	}
 
 	public static Object deserializeComplex(JSONObject value) {
@@ -141,11 +113,6 @@ public class Main {
                         if(arrayItem instanceof JSONObject) {
                             JSONObject jsonArrayItem = (JSONObject) arrayItem;
                             result.add(deserializeComplex(jsonArrayItem));
-                            /*
-                            XCacheComplexObject item_value = new Seller();   //replace this with an XCacheComplexObject instantiation class
-                            item_value.deserialize(jsonArrayItem.toJSONString());
-                            result.add(item_value);
-                            */
                         }
                     }
                     return result;
@@ -184,7 +151,6 @@ public class Main {
 
 
                                 XCacheComplexObject item_value = new Seller();   //replace this with an XCacheComplexObject instantiation class
-                                //item_value.deserialize(mapValue.toJSONString());
                                 map.put(keyValue, deserializeComplex(mapValue));
                             }
                         } //end for loop.
@@ -195,7 +161,6 @@ public class Main {
             else  // if it falls through then it is a ComplexObject
             {
                 logger.debug("I didn't find a Map or a List, presuming XCacheComplexObject");
-                //JSONObject payload = (JSONObject) value.get(ENTRY_VALUE);
                 XCacheComplexObject item_value = new Seller();   //replace this with an XCacheComplexObject instantiation class
                 if(item_value == null)
                     return null;
@@ -237,6 +202,11 @@ public class Main {
 		return parent_map;
 	}
 
+    /**
+     *
+     * @param fileName destination file to write to.
+     * @param data String representation of the data to write to file.
+     */
     public static void writeToFile(String fileName, String data)
     {
         try {
@@ -252,6 +222,11 @@ public class Main {
         }
     }
 
+    /**
+     *
+     * @param fileName source file to read from
+     * @return text representing the content of the file.
+     */
     public static String readFromfile(String fileName)
     {
         StringBuffer buffer = new StringBuffer();
@@ -277,10 +252,8 @@ public class Main {
         Object ret =  serializeComplex(list);
         String buffer = "";
 
-        if( ret instanceof JSONArray)
-            buffer = ((JSONArray)ret).toJSONString();
-        else if(ret instanceof JSONObject)
-            buffer = ((JSONObject)ret).toJSONString();
+
+         buffer = ((JSONObject)ret).toJSONString();
 
         return buffer;
 
@@ -297,19 +270,29 @@ public class Main {
         String buffer = "";
 		Object ret =  serializeComplex(simpleMap);
 
+        buffer = ((JSONObject)ret).toJSONString();
+
+        return buffer;
+    }
+    public static String writeObject(String type)
+    {
+        Map map = buildMapInstance();
+        Object ret = serializeComplex(map);
+
+        String buffer = "";
+
         if( ret instanceof JSONArray)
             buffer = ((JSONArray)ret).toJSONString();
         else if(ret instanceof JSONObject)
             buffer = ((JSONObject)ret).toJSONString();
 
         return buffer;
-    }
-    public static void writeObject(String type)
-    {
-        //JSONObject foobar = serializeComplex(serializeMe);
-        Map map = buildMapInstance();
 
-        /*
+    }
+
+    {
+            /*
+        //for reference
 		Map simpleMap = new HashMap();
 		Map simpleMap2 = new HashMap();
 		Map simpleMap3 = new HashMap();
@@ -336,7 +319,6 @@ public class Main {
 		//secondLevel.put("34", simpleMap3);
 
 
-        */
         String buffer = "";
 		Object ret =  serializeComplex(map);
 
@@ -350,6 +332,7 @@ public class Main {
 
         writeToFile("/tmp/samir.json", buffer);
 
+        */
     }
 
     public static void generateSampleData()
@@ -364,7 +347,7 @@ public class Main {
 
     public static void readSampleData()
     {
-         String fileName = "/tmp/map.json";
+         String fileName = "/tmp/samir.json";
 
         String raw_data = readFromfile(fileName);
         JSONParser parser = new JSONParser();
@@ -384,7 +367,7 @@ public class Main {
 
 	public static void main(String[] args) {
         //generateSampleData();
-        //writeObject("");
+        writeObject("");
         readSampleData();
 
 
